@@ -3,12 +3,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "test.h"
-#include "../peterson/peterson.h"
 
 static int value[] = { 0 };
 
-static void* flag_turn = NULL;
-static struct peterson peterson; 
+static volatile struct fifo
+{
+	volatile int in;
+	volatile int out;
+} fifo[1] = { { -1, 0 } };
 
 static pthread_t* thread = NULL;
 
@@ -16,10 +18,6 @@ struct test* prepare(int n)
 {
 	struct test* test = NULL;
 	int i;
-
-	if(!(flag_turn = malloc(peterson_flag_turn_size(n))))
-		return NULL;
-	peterson_initial(&peterson, n, flag_turn);
 
 	if(!(test = malloc(sizeof(*test) * n)))
 		return NULL;
@@ -49,11 +47,16 @@ void waitroutine(int id)
 
 void lock(int i)
 {
-	peterson_lock(&peterson, i);
+    int ticket;
+    do
+    {
+        ticket = fifo->in + 1;
+    }while(!__sync_bool_compare_and_swap(&fifo->in, ticket - 1, ticket));
+    while(fifo->out != ticket);
 }
 
 void unlock(int i)
 {
-	peterson_unlock(&peterson, i);
+	fifo->out++;
 }
 

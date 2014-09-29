@@ -5,15 +5,20 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 #include "test.h"
-#include "../peterson/peterson.h"
 
 static void* shared = NULL;
 
 static int* value = NULL;
 
-static void* flag_turn = NULL;
-static struct peterson* peterson = NULL;
+static volatile struct fifo
+{
+	int in;
+	int out;
+}* fifo = NULL;
+
+static int null = -1;
 
 static pid_t* process = NULL;
 
@@ -22,15 +27,22 @@ struct test* prepare(int n)
 	struct test* test = NULL;
 	int i;
 
-	if(!(shared = mmap(NULL, peterson_flag_turn_size(n) + sizeof(*peterson) + sizeof(*value) + sizeof(*test) * n, PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0)))
+	if(!(shared = mmap(NULL, sizeof(*value) + sizeof(*fifo) + sizeof(*test) * n, PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0)))
 		return NULL;
-	flag_turn = shared;
-	peterson = shared + peterson_flag_turn_size(n);
-	peterson_initial(peterson, n, flag_turn);
+	else
+	{
+		void* p = shared;
+		value = p; p += sizeof(*value);
+		fifo = p; p += sizeof(*fifo);
+		test = p;
+	}
 
-	value = shared + peterson_flag_turn_size(n) + sizeof(*peterson);
 	*value = 0;
-	test = shared + peterson_flag_turn_size(n) + sizeof(*peterson)  + sizeof(*value);
+	fifo->in = -1;
+	fifo->out = 0;
+
+	if(-1 == (null = open("/dev/null", O_RDONLY)))
+		return NULL;
 
 	if(!(process = malloc(sizeof(*process) * n)))
 		return NULL;
@@ -62,13 +74,21 @@ void waitroutine(int id)
 	waitpid(process[id], NULL, 0);
 }
 
+static unsigned char buffer[1];
+
 void lock(int i)
 {
-	peterson_lock(peterson, i);
+	int ticket;
+	do
+	{
+		ticket = fifo->in + 1;
+	}while(!__sync_bool_compare_and_swap(&fifo->in, ticket - 1, ticket));
+	while(fifo->out != ticket)
+		read(null, buffer, 1);
 }
 
 void unlock(int i)
 {
-	peterson_unlock(peterson, i);
+	fifo->out++;
 }
 

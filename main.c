@@ -23,8 +23,7 @@ int main(int argc, char** argv)
     loop(test + n);
     if(gettimeofday(&end, NULL)) return -1;
 
-    printf("%d\n", *test[n].value);
-    printf("%s\n", elapse(&begin, &end));
+    printf("%s/%d\n", elapse(&begin, &end), *test[n].value);
 
 	for(i = 0; i < n; i++)
 		waitroutine(i);

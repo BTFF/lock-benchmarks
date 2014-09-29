@@ -33,8 +33,9 @@ static volatile int sig = 0;
 
 static void sigusr1(int s)
 {
-	//printf("%s %d %s %d\n", __FILE__, __LINE__, __FUNCTION__, getpid());
-	sig = s;
+	printf("%s %d %s %d\n", __FILE__, __LINE__, __FUNCTION__, getpid()); fflush(stdout);
+	if(SIGUSR1 == s)
+		sig = s;
 }
 
 struct test* prepare(int n)
@@ -63,7 +64,7 @@ struct test* prepare(int n)
 	sigprocmask(0, NULL, &mask);
 	signal(SIGUSR1, sigusr1);
 	sigaddset(&mask, SIGUSR1);
-	//sigprocmask(SIG_SETMASK, &mask, &oldmask);
+	sigprocmask(SIG_SETMASK, &mask, &oldmask);
 
 	for(i = 0; i < n; i++)
 	{
@@ -119,15 +120,17 @@ void lock(int i)
 
 	if(-1 != wait)
 	{
+		printf("%d %d\n", SIGUSR1, sig);
+		sigprocmask(SIG_SETMASK, &oldmask, NULL);
 		while(SIGUSR1 != sig)
 		{
-			sigprocmask(SIG_BLOCK, &mask, &oldmask); /* block SIGUSR1 */
-			//printf("%s %d %s %d\n", __FILE__, __LINE__, __FUNCTION__, getpid());
-			if(SIGUSR1 != sig)
-				sigsuspend(&oldmask);
-			//printf("%s %d %s %d\n", __FILE__, __LINE__, __FUNCTION__, getpid());
-			sigprocmask(SIG_UNBLOCK, &mask, NULL); /* unblock SIGUSR1 */
+			printf("%d %d\n", SIGUSR1, sig);
+			printf("%s %d %s %d\n", __FILE__, __LINE__, __FUNCTION__, getpid()); fflush(stdout);
+			pause();
+			printf("%d %d\n", SIGUSR1, sig);
+			printf("%s %d %s %d\n", __FILE__, __LINE__, __FUNCTION__, getpid()); fflush(stdout);
 		}
+		sigprocmask(SIG_SETMASK, &mask, NULL);
 		sig = 0;
 	}
 }

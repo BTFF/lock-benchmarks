@@ -14,6 +14,8 @@ struct test
 {
 	int id;
 	volatile int* value;
+	int pipe[2];
+	struct test* next;
 };
 
 struct test* prepare(int n);

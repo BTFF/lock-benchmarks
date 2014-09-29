@@ -17,35 +17,17 @@ static void* shared = NULL;
 
 static int* value = NULL;
 
-static int fd = -1;
-static char template[64];
 static int semid = -1;
 
 static pid_t* process = NULL;
-
-static void cleanup(void)
-{
-	if(-1 != semid)
-		semctl(semid, 0, IPC_RMID);
-    if(-1 != fd)
-        close(fd);
-    unlink(template);
-}
 
 struct test* prepare(int n)
 {
 	struct test* test = NULL;
 	int i;
-	key_t key;
 	union semun arg;
 
-    atexit(cleanup);
-	sprintf(template, "process_v_sem.%d", getpid());
-    if(-1 == (fd = mkstemp(template)))
-        return NULL;
-	if(-1 == (key = ftok(template, 0)))
-		return NULL;
-	if(-1 == (semid = semget(key, 1, 0600|IPC_CREAT)))
+	if(-1 == (semid = semget(IPC_PRIVATE, 1, 0600|IPC_CREAT)))
 		return NULL;
 	arg.val = 1;
 	if(-1 == semctl(semid, 0, SETVAL, arg))
@@ -53,9 +35,12 @@ struct test* prepare(int n)
 
 	if(!(shared = mmap(NULL, sizeof(*value) + sizeof(*test) * n, PROT_READ|PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0)))
 		return NULL;
-	value = shared;
-	*value = 0;
-	test = shared + sizeof(*value);
+	else
+	{
+		void* p = shared;
+		value = p; p += sizeof(*value);
+		test = p;
+	}
 
 	if(!(process = malloc(sizeof(*process) * n)))
 		return NULL;

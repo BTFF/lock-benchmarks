@@ -15,37 +15,19 @@
 
 static int value[] = { 0 };
 
-static int fd = -1;
-static char template[64];
 static int semid = -1;
 
 static pthread_t* thread = NULL;
-
-static void cleanup(void)
-{
-	if(-1 != semid)
-		semctl(semid, 0, IPC_RMID);
-    if(-1 != fd)
-        close(fd);
-    unlink(template);
-}
 
 struct test* prepare(int n)
 {
 	struct test* test = NULL;
 	int i;
-	key_t key;
 	union semun arg;
 
-    atexit(cleanup);
-    sprintf(template, "process_flock.%d", getpid());
-    if(-1 == (fd = mkstemp(template)))
-        return NULL;
-	if(-1 == (key = ftok(template, 0)))
+	if(-1 == (semid = semget(IPC_PRIVATE, 1, 0600|IPC_CREAT)))
 		return NULL;
-	if(-1 == (semid = semget(key, 1, 0600|IPC_CREAT)))
-		return NULL;
-		arg.val = 1;
+	arg.val = 1;
 	if(-1 == semctl(semid, 0, SETVAL, arg))
 		return NULL;
 
